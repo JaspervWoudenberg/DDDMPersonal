@@ -1,1 +1,488 @@
+<!DOCTYPE html>  
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Container Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        #map {
+            height: 600px;
+            width: 100%;
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .controls {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+
+        .legend {
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            margin-top: 10px;
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            z-index: 1000;
+        }
+
+        .legend-item {
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            margin: 0 0 0.5rem 0;
+            color: #333;
+            font-size: 1rem;
+        }
+
+        .stat-card p {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #2563eb;
+        }
+
+        .stat-card .secondary {
+            font-size: 0.875rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Container Dashboard</h1>
+        
+        <div class="controls">
+            <label for="csvFile">Upload CSV file:</label>
+            <input type="file" id="csvFile" accept=".csv">
+
+            <div>
+                <label for="startDate">From:</label>
+                <input type="date" id="startDate">
+                <label for="endDate">Until:</label>
+                <input type="date" id="endDate">
+                <button id="filterButton">Apply Filter</button>
+            </div>
+
+            <div>
+                <h3>Predict Future Demand</h3>
+                <label for="futureDate">Select Future Date:</label>
+                <input type="date" id="futureDate">
+                <button id="predictButton">Predict</button>
+                <button id="clearPredictionButton">Clear Predictions</button>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Totaal Aantal Containers</h3>
+                <p id="totalContainers">-</p>
+                <div class="secondary">Alle types gecombineerd</div>
+            </div>
+            <div class="stat-card">
+                <h3>10m³ Containers</h3>
+                <p id="total10m3">-</p>
+                <div class="secondary" id="percentage10m3">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>6m³ Containers</h3>
+                <p id="total6m3">-</p>
+                <div class="secondary" id="percentage6m3">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>3m³ Containers</h3>
+                <p id="total3m3">-</p>
+                <div class="secondary" id="percentage3m3">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Aantal Locaties</h3>
+                <p id="totalLocations">-</p>
+                <div class="secondary">Unieke plaatsen</div>
+            </div>
+            <div class="stat-card">
+                <h3>Meest Voorkomend Type</h3>
+                <p id="mostCommonType">-</p>
+                <div class="secondary" id="mostCommonTypePercentage">-</div>
+            </div>
+            <!-- Nieuwe Card voor Meeste Bestellingen -->
+            <div class="stat-card">
+                <h3>Meeste Bestellingen</h3>
+                <p id="mostOrdersCustomer">-</p>
+                <div class="secondary">Klant met de meeste bestellingen</div>
+            </div>
+            <!-- Nieuwe Cards voor voorspelling -->
+            <div class="stat-card">
+                <h3>Voorspeld Aantal Containers</h3>
+                <p id="predictedTotalContainers">-</p>
+                <div class="secondary">Alle types gecombineerd (Voorspelling)</div>
+            </div>
+            <div class="stat-card">
+                <h3>Voorspeld 10m³ Containers</h3>
+                <p id="predictedTotal10m3">-</p>
+            </div>
+            <div class="stat-card">
+                <h3>Voorspeld 6m³ Containers</h3>
+                <p id="predictedTotal6m3">-</p>
+            </div>
+            <div class="stat-card">
+                <h3>Voorspeld 3m³ Containers</h3>
+                <p id="predictedTotal3m3">-</p>
+            </div>
+        </div>
+
+        <div id="map"></div>
+        <div class="legend">
+            <div class="legend-item">
+                <span class="legend-dot" style="background-color: blue;"></span>
+                10m³ Containers (Most Common)
+            </div>
+            <div class="legend-item">
+                <span class="legend-dot" style="background-color: green;"></span>
+                6m³ Containers (Most Common)
+            </div>
+            <div class="legend-item">
+                <span class="legend-dot" style="background-color: red;"></span>
+                3m³ Containers (Most Common)
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script>
+        let deliveryData = [];
+        let predictionMarkers = [];
+        let map;
+
+        // Initialize map after DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            map = L.map('map').setView([52.1326, 5.2913], 8);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        });
+
+        async function geocodePlace(place) {
+            try {
+                const formattedPlace = `${place}, Netherlands`;
+                const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(formattedPlace)}&format=json&limit=1`;
+
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.length > 0) {
+                    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                }
+                return { lat: 52.1326, lng: 5.2913 }; // Default to central Netherlands
+            } catch {
+                return { lat: 52.1326, lng: 5.2913 };
+            }
+        }
+
+        function getMostCommonContainerType(containers) {
+            let maxCount = 0;
+            let mostCommonType = null;
+            
+            for (const [type, count] of Object.entries(containers)) {
+                if (count > maxCount) {
+                    maxCount = count;
+                    mostCommonType = type;
+                }
+            }
+            
+            return mostCommonType;
+        }
+
+        function getMarkerColor(containerType) {
+            if (containerType === '10m3') return 'blue';
+            if (containerType === '6m3') return 'green';
+            if (containerType === '3m3') return 'red';
+            return 'gray';
+        }
+
+        function createPopupContent(place, containers, total, mostCommonType) {
+            let content = `Plaats: ${place}\n`;
+            content += `Meest voorkomend: ${mostCommonType}\n`;
+            content += `Totaal: ${total}\n`;
+
+            // Define fixed order of container types
+            const containerOrder = ['10m3', '6m3', '3m3'];
+            
+            // Add container counts in fixed order
+            containerOrder.forEach(type => {
+                if (type in containers) {
+                    content += `${type}: ${containers[type]}\n`;
+                } else {
+                    content += `${type}: 0\n`;
+                }
+            });
+            
+            // Replace newlines with <br> for HTML display
+            return content.split('\n').filter(line => line).join('<br>');
+        }
+
+        function getCustomerWithMostOrders(filteredData) {
+            const customerOrders = {};
+
+            // Telt het aantal bestellingen per klant
+            filteredData.forEach(row => {
+                const customer = row.Klantnaam?.trim();
+                const orderCount = 1; // Elke rij vertegenwoordigt een bestelling
+
+                if (!customer) return;
+
+                if (!customerOrders[customer]) {
+                    customerOrders[customer] = 0;
+                }
+                customerOrders[customer] += orderCount;
+            });
+
+            // Zoek de klant met de meeste bestellingen
+            let maxOrders = 0;
+            let mostOrdersCustomer = null;
+
+            for (const [customer, orderCount] of Object.entries(customerOrders)) {
+                if (orderCount > maxOrders) {
+                    maxOrders = orderCount;
+                    mostOrdersCustomer = customer;
+                }
+            }
+
+            return mostOrdersCustomer;
+        }
+
+        function updateStatistics(filteredData, predictedData = null) {
+            // Initialize counters
+            let total = 0;
+            let total10m3 = 0;
+            let total6m3 = 0;
+            let total3m3 = 0;
+            const uniqueLocations = new Set();
+
+            // Calculate totals
+            filteredData.forEach(row => {
+                const count = parseInt(row['Aantal Containers']) || 0;
+                const type = row.Container?.trim();
+                const place = row.Plaats?.trim();
+
+                if (place) uniqueLocations.add(place);
+
+                total += count;
+                if (type === '10m3') total10m3 += count;
+                if (type === '6m3') total6m3 += count;
+                if (type === '3m3') total3m3 += count;
+            });
+
+            // Calculate percentages
+            const percentage10m3 = ((total10m3 / total) * 100).toFixed(1);
+            const percentage6m3 = ((total6m3 / total) * 100).toFixed(1);
+            const percentage3m3 = ((total3m3 / total) * 100).toFixed(1);
+
+            // Determine most common type
+            const typeCount = [
+                { type: '10m3', count: total10m3 },
+                { type: '6m3', count: total6m3 },
+                { type: '3m3', count: total3m3 }
+            ];
+            const mostCommon = typeCount.reduce((prev, current) =>
+                (prev.count > current.count) ? prev : current
+            );
+
+            // Get the customer with the most orders
+            const mostOrdersCustomer = getCustomerWithMostOrders(filteredData);
+
+            // Update UI
+            document.getElementById('totalContainers').textContent = total.toLocaleString();
+            document.getElementById('total10m3').textContent = total10m3.toLocaleString();
+            document.getElementById('total6m3').textContent = total6m3.toLocaleString();
+            document.getElementById('total3m3').textContent = total3m3.toLocaleString();
+            document.getElementById('totalLocations').textContent = uniqueLocations.size.toLocaleString();
+            document.getElementById('mostCommonType').textContent = mostCommon.type;
+
+            document.getElementById('percentage10m3').textContent = `${percentage10m3}% van totaal`;
+            document.getElementById('percentage6m3').textContent = `${percentage6m3}% van totaal`;
+            document.getElementById('percentage3m3').textContent = `${percentage3m3}% van totaal`;
+            document.getElementById('mostCommonTypePercentage').textContent =
+                `${((mostCommon.count / total) * 100).toFixed(1)}% van totaal`;
+
+            // Update the most orders customer card
+            document.getElementById('mostOrdersCustomer').textContent = mostOrdersCustomer || '-';
+
+            // Display predicted statistics for the selected future date
+            if (predictedData) {
+                let predictedTotal = 0;
+                let predicted10m3 = 0;
+                let predicted6m3 = 0;
+                let predicted3m3 = 0;
+
+                predictedData.forEach(row => {
+                    const predictedCount = parseInt(row['Aantal Containers']) || 0;
+                    const type = row.Container?.trim();
+
+                    predictedTotal += predictedCount;
+                    if (type === '10m3') predicted10m3 += predictedCount;
+                    if (type === '6m3') predicted6m3 += predictedCount;
+                    if (type === '3m3') predicted3m3 += predictedCount;
+                });
+
+                // Update predicted statistics in the UI
+                document.getElementById('predictedTotalContainers').textContent = predictedTotal.toLocaleString();
+                document.getElementById('predictedTotal10m3').textContent = predicted10m3.toLocaleString();
+                document.getElementById('predictedTotal6m3').textContent = predicted6m3.toLocaleString();
+                document.getElementById('predictedTotal3m3').textContent = predicted3m3.toLocaleString();
+            }
+        }
+
+        async function addMarkers(data) {
+            // Clear existing markers
+            map.eachLayer(layer => {
+                if (layer instanceof L.CircleMarker) {
+                    map.removeLayer(layer);
+                }
+            });
+
+            const placeTotals = {};
+            data.forEach(row => {
+                const place = row.Plaats?.trim();
+                const containerCount = parseInt(row['Aantal Containers']);
+                const containerType = row.Container?.trim();
+
+                if (!place || isNaN(containerCount) || !containerType) return;
+
+                if (!placeTotals[place]) {
+                    placeTotals[place] = { total: 0, containers: {} };
+                }
+                placeTotals[place].total += containerCount;
+
+                if (!placeTotals[place].containers[containerType]) {
+                    placeTotals[place].containers[containerType] = 0;
+                }
+                placeTotals[place].containers[containerType] += containerCount;
+            });
+
+            for (const [place, { total, containers }] of Object.entries(placeTotals)) {
+                const coordinates = await geocodePlace(place);
+                const radius = Math.sqrt(total) * 1.5;
+                
+                const mostCommonType = getMostCommonContainerType(containers);
+                const markerColor = getMarkerColor(mostCommonType);
+
+                const marker = L.circleMarker([coordinates.lat, coordinates.lng], {
+                    color: 'black',
+                    fillColor: markerColor,
+                    radius: radius,
+                    fillOpacity: 0.6
+                }).addTo(map);
+
+                const popupContent = createPopupContent(place, containers, total, mostCommonType);
+                marker.bindPopup(popupContent);
+            }
+        }
+
+        function updateMap() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const futureDate = document.getElementById('futureDate').value;  // Get the future date
+
+            if (!startDate && !endDate && !futureDate) {
+                alert("Please select at least one date filter.");
+                return;
+            }
+
+            const filteredData = deliveryData.filter(row => {
+                if (!row.Datum) return false;
+
+                const date = new Date(row.Datum);
+                if (isNaN(date.getTime())) {
+                    console.warn(`Invalid date format in row: ${row.Datum}`);
+                    return false;
+                }
+
+                const start = startDate ? new Date(startDate) : null;
+                const end = endDate ? new Date(endDate) : null;
+
+                return (!start || date >= start) && (!end || date <= end);
+            });
+
+            // Now get predicted data for the selected future date
+            let predictedData = [];
+            if (futureDate) {
+                predictedData = deliveryData.filter(row => {
+                    const date = new Date(row.Datum);
+                    return date.toISOString().split('T')[0] === futureDate;  // Matching the future date
+                });
+            }
+
+            updateStatistics(filteredData, predictedData);
+            addMarkers(filteredData);
+        }
+
+        // Event Listeners
+        document.getElementById('filterButton').addEventListener('click', updateMap);
+
+        document.getElementById('csvFile').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    deliveryData = results.data;
+                    updateMap();
+                }
+            });
+        });
+
+        document.getElementById('clearPredictionButton').addEventListener('click', () => {
+            predictionMarkers.forEach(marker => {
+                map.removeLayer(marker);
+            });
+            predictionMarkers = [];
+        });
+    </script>
+</body>
+</html>
 
